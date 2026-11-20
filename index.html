@@ -15,6 +15,10 @@
   <!-- Icons -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lucide-static@0.344.0/font/lucide.min.css">
 
+  <!-- Bibliotecas para geração de PDF (jsPDF + AutoTable) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
   <!-- CSS -->
   <link rel="stylesheet" href="style.css">
   <style>
@@ -45,6 +49,31 @@
       background: var(--primary-accent, #1a73e8);
       color: #fff;
       border-color: transparent;
+    }
+
+    .btn-export-pdf {
+      background-color: #c5221f;
+      color: #ffffff;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 2px 4px rgba(197, 34, 31, 0.2);
+      transition: background-color 0.2s, transform 0.1s;
+    }
+
+    .btn-export-pdf:hover {
+      background-color: #a51d1a;
+    }
+
+    .btn-export-pdf:active {
+      transform: scale(0.97);
     }
   </style>
 </head>
@@ -141,10 +170,15 @@
         <hr class="section-divider" />
 
         <!-- Alerts Section -->
-        <h3 class="section-title"
-          style="color: #c5221f; display: flex; align-items: center; justify-content: space-between;">
-          <span><i class="icon-lucide lucide-bell-ring"></i> Alertas de Reposição</span>
-        </h3>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 16px; margin-top: 8px; flex-wrap: wrap;">
+          <h3 class="section-title" style="color: #c5221f; margin: 0;">
+            <i class="icon-lucide lucide-bell-ring"></i> Alertas de Reposição
+          </h3>
+          <button type="button" id="btnExportPdf" class="btn-export-pdf">
+            <i class="icon-lucide lucide-file-down" style="width: 16px; height: 16px;"></i>
+            Exportar PDF
+          </button>
+        </div>
 
         <!-- Filtros por Categoria para os Alertas -->
         <div id="alertCategoryChips" class="chips-container">
