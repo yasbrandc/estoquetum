@@ -32,6 +32,62 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // Busca a última linha preenchida diretamente na aba Fato_Contagem
+  async function fetchLastCountFromSheet() {
+    try {
+      if (!CONFIG.GOOGLE_SHEETS_API_KEY || !CONFIG.SPREADSHEET_ID) {
+        return null;
+      }
+
+      const sheetName = CONFIG.FATO_CONTAGEM_SHEET || 'Fato_Contagem';
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SPREADSHEET_ID}/values/${encodeURIComponent(sheetName)}?key=${CONFIG.GOOGLE_SHEETS_API_KEY}`;
+      const response = await fetch(url);
+
+      if (!response.ok) return null;
+
+      const sheetData = await response.json();
+      const rows = sheetData.values;
+      if (!rows || rows.length < 2) return null;
+
+      const headers = rows[0].map(h => h.toString().toLowerCase().trim());
+      const dataIdx = headers.findIndex(h => h.includes('data'));
+      const respIdx = headers.findIndex(h => h.includes('respons'));
+
+      // Percorre de baixo para cima para pegar o último registro válido
+      for (let i = rows.length - 1; i >= 1; i--) {
+        const row = rows[i];
+        if (!row || row.length === 0) continue;
+
+        const resp = respIdx !== -1 ? (row[respIdx] || '').toString().trim() : '';
+        const rawDate = dataIdx !== -1 ? (row[dataIdx] || '').toString().trim() : '';
+
+        if (resp || rawDate) {
+          return {
+            responsavel: resp || 'N/A',
+            data: formatarDataHora(rawDate) || 'Sem registro'
+          };
+        }
+      }
+    } catch (err) {
+      console.warn('Não foi possível ler Fato_Contagem diretamente:', err);
+    }
+    return null;
+  }
+
+  function formatarDataHora(valor) {
+    if (!valor) return '';
+    // Se vier no formato ISO ou YYYY-MM-DD HH:MM:SS
+    const matchISO = valor.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2}))?)?/);
+    if (matchISO) {
+      const [, ano, mes, dia, hora, min, seg] = matchISO;
+      if (hora && min) {
+        return `${dia}/${mes}/${ano} ${hora}:${min}${seg ? ':' + seg : ''}`;
+      }
+      return `${dia}/${mes}/${ano}`;
+    }
+    return valor;
+  }
+
   async function loadData() {
     showState('loading');
     if (btnRefresh) {
@@ -47,7 +103,12 @@ document.addEventListener('DOMContentLoaded', () => {
       // Sistema anti-cache para garantir leitura imediata
       const separador = CONFIG.APPS_SCRIPT_URL.includes('?') ? '&' : '?';
       const urlAtualizado = CONFIG.APPS_SCRIPT_URL + separador + 'nocache=' + new Date().getTime();
-      const response = await fetch(urlAtualizado);
+
+      // Busca em paralelo o dashboard do Apps Script e a última contagem da aba Fato_Contagem
+      const [response, sheetLastCount] = await Promise.all([
+        fetch(urlAtualizado),
+        fetchLastCountFromSheet()
+      ]);
 
       if (!response.ok) {
         throw new Error(`Erro na ligação ao servidor: ${response.status}`);
@@ -64,9 +125,13 @@ document.addEventListener('DOMContentLoaded', () => {
         throw new Error('O inventário encontra-se vazio ou os dados são inválidos.');
       }
 
+      const apiLastCount = (data.lastCount && data.lastCount.responsavel && data.lastCount.responsavel !== 'N/A')
+        ? data.lastCount
+        : null;
+
       globalData = {
         items: itensRecebidos,
-        lastCount: data.lastCount || { responsavel: 'N/A', data: 'Sem registo' }
+        lastCount: sheetLastCount || apiLastCount || { responsavel: 'N/A', data: 'Sem registro' }
       };
 
       processDashboardData();
@@ -88,7 +153,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function processDashboardData() {
     if (globalData.lastCount) {
       lastResponsibleEl.textContent = globalData.lastCount.responsavel || 'N/A';
-      lastDateEl.textContent = globalData.lastCount.data || 'Sem registo';
+      lastDateEl.textContent = globalData.lastCount.data || 'Sem registro';
     }
 
     const categoriasMap = {};
